@@ -1,6 +1,6 @@
 Yolov3 Detector Super
 
-Detect objects on image using different image resolutions.
+Detect objects on image using different image resolutions. (Edit WIDTH and HEIGTH in .cfg file)
 If you like to use only 1 resolution - just select 1 resolution))
 
 Requirements:
