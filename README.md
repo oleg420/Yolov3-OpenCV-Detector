@@ -1,5 +1,8 @@
 Yolov3 Detector Super
 
+Detect objects on image using different image resolutions.
+If you like to use only 1 resolution - just select 1 resolution))
+
 Requirements:
 - Python 3 or higher
 - OpenCV 3.4 or higher
