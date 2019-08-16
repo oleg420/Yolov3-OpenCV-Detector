@@ -49,15 +49,17 @@ for path in imagePaths:
     now = datetime.datetime.now()
     now = datetime.datetime.now()
     for i in range(len(nn_inputs)):
+        loop = datetime.datetime.now()
         tmpBoxes, tmpClassConfidences, tmpClassIDs = yoloDetectors[i].detect(image, confidenceThreshold=args.threshold)
         boxes += tmpBoxes
         classConfidences += tmpClassConfidences
         classIDs += tmpClassIDs
+        print('Loop %d(%s) compute time: %s' % (i, nn_inputs[i],str(datetime.datetime.now() - loop)))
 
     classes, confidences, boxes = yoloDetectors[0].NMSCompress(image, boxes, classIDs, classConfidences,
                                                                confidenceThreshold=args.threshold,
                                                                nmsThreshold=args.nms_threshold)
-    print('Compute time: %s' % str(datetime.datetime.now() - now))
+    print('Total compute time: %s' % str(datetime.datetime.now() - now))
 
     for i in range(len(classes)):
         image = yoloDetectors[0].draw(image, '', boxes[i], label_size=1)
