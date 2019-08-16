@@ -100,7 +100,6 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, required=True, help='Path to YOLOv3 cfg file')
     parser.add_argument('--weights', type=str, required=True, help='Path to YOLOv3 weights file')
     parser.add_argument('--classes', type=str, required=True, help='Path to YOLOv3 class file')
-    parser.add_argument('--search_classes', type=str, help='Array of search classes. Only this classes will detect')
     parser.add_argument('--threshold', type=float, default=0.5, help='Threshold value')
     parser.add_argument('--nms_threshold', type=float, default=0.25, help='NMS threshold value')
     parser.add_argument('--nn_input', type=str, default='320,416,512', help='Input size of YOLOv3 CNN')
