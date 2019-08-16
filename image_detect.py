@@ -71,7 +71,8 @@ for path in imagePaths:
     cv2.imshow('%s' % path, image)
     print('Enter anything to continue (q to exit)')
     if cv2.waitKey() & 0xFF == ord('q'):
-        break
+        print('Terminating')
+        exit(0)
     cv2.destroyAllWindows()
 
 cv2.waitKey()
