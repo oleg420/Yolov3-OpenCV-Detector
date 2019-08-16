@@ -95,6 +95,30 @@ class Detector:
         return image
 
 if __name__ == '__main__':
+
+    def imageResize(image, width=None, height=None, inter=cv2.INTER_AREA):
+        """
+        Resize image with saving original proportions.
+        :param image: Image itself.
+        :param width: New image width.
+        :param height: New image height.
+        :param inter: Interpolation method.
+        :return: New resized image.
+        """
+        if width is None and height is None:
+            return image
+
+        (h, w) = image.shape[:2]
+
+        if width is None:
+            r = height / float(h)
+            dim = (int(w * r), height)
+        else:
+            r = width / float(w)
+            dim = (width, int(h * r))
+
+        return cv2.resize(image, dim, interpolation=inter)
+
     parser = argparse.ArgumentParser('Yolov3 Detector Super')
     parser.add_argument('--image', type=str, required=True, help='Image source')
     parser.add_argument('--config', type=str, required=True, help='Path to YOLOv3 cfg file')
@@ -121,6 +145,14 @@ if __name__ == '__main__':
 
     image = cv2.imread(args.image)
     height, width, _ = image.shape
+
+    if height > 720:
+        image = imageResize(image=image, height=720)
+        height, width, _ = image.shape
+    elif width > 1280:
+        image = imageResize(image=image, width=1080)
+        height, width, _ = image.shape
+
     print('W: %d H: %d' % (width, height))
 
     boxes = []
