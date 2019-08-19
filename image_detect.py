@@ -44,15 +44,11 @@ print('Threshold: %f' % args.threshold)
 print('NMS threshold: %f' % args.nms_threshold)
 print('Input size: %s' % args.nn_input)
 
-configs = args.config.split(',')
 nn_inputs = args.nn_input.split(',')
-if len(configs) != len(nn_inputs):
-    print('Error')
-    exit(1)
 
 yoloDetectors = []
 for i in range(len(nn_inputs)):
-    yoloDetectors.append(Detector(config=configs[i], weights=args.weights, classes=args.classes, nn_input=int(nn_inputs[i])))
+    yoloDetectors.append(Detector(config=args.config, weights=args.weights, classes=args.classes, nn_input=int(nn_inputs[i])))
 
 imagePaths = glob.glob(os.path.abspath(args.path) + '/*.jpg')
 imagePaths += glob.glob(os.path.abspath(args.path) + '/*.png')
