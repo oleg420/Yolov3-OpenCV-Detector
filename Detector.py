@@ -83,9 +83,9 @@ class Detector:
                 yMax = height - 1
 
             rClasses.append(self.__classes[classIDs[i]])
-            rBoxes.append([xMin, yMin, xMax, yMax])
+            rBoxes.append([int(xMin), int(yMin), int(xMax), int(yMax)])
 
-        return rClasses, classConfidences, rBoxes
+        return rBoxes, classConfidences, rClasses
 
     def draw(self, image, label, box, label_color=(255, 255, 255), rec_color=(255, 255, 255),
              label_thickness=2, rec_thickness=2, label_size=0.5):

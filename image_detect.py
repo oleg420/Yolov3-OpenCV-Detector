@@ -38,10 +38,12 @@ parser.add_argument('--classes', type=str, required=True, help='Path to YOLOv3 c
 parser.add_argument('--threshold', type=float, default=0.5, help='Threshold value')
 parser.add_argument('--nms_threshold', type=float, default=0.15, help='NMS threshold value')
 parser.add_argument('--nn_input', type=str, default='320,416,512', help='Input size of YOLOv3 CNN')
+parser.add_argument('--nms_union', type=int, default=1)
 args = parser.parse_args()
 
 print('Threshold: %f' % args.threshold)
 print('NMS threshold: %f' % args.nms_threshold)
+print('NMS union: %d' % args.nms_union)
 print('Input size: %s' % args.nn_input)
 
 nn_inputs = args.nn_input.split(',')
@@ -69,23 +71,35 @@ for path in imagePaths:
     print('========= [Path: %s] =========' % path)
     print('W: %d H: %d' % (width, height))
 
-    boxes = []
-    classConfidences = []
-    classIDs = []
+    rawBoxes = []
+    rawConfidences = []
+    rawClasses = []
 
-    now = datetime.datetime.now()
     now = datetime.datetime.now()
     for i in range(len(nn_inputs)):
         loop = datetime.datetime.now()
-        tmpBoxes, tmpClassConfidences, tmpClassIDs = yoloDetectors[i].detect(image, confidenceThreshold=args.threshold)
-        boxes += tmpBoxes
-        classConfidences += tmpClassConfidences
-        classIDs += tmpClassIDs
+        tmpBoxes, tmpConfidences, tmpClasses = yoloDetectors[i].detect(image, confidenceThreshold=args.threshold)
+
+        if not args.nms_union:
+            tmpBoxesStage1, tmpConfidencesStage1, tmpClassesStage1 = yoloDetectors[0].NMSCompress(image, tmpBoxes, tmpClasses, tmpConfidences,
+                                                                                 confidenceThreshold=args.threshold,
+                                                                                 nmsThreshold=args.nms_threshold)
+            rawBoxes += tmpBoxesStage1
+            rawConfidences += tmpConfidencesStage1
+            rawClasses += tmpClassesStage1
+        else:
+            rawBoxes += tmpBoxes
+            rawConfidences += tmpConfidences
+            rawClasses += tmpClasses
         print('Loop %d(%s) compute time: %s' % (i, nn_inputs[i],str(datetime.datetime.now() - loop)))
 
-    classes, confidences, boxes = yoloDetectors[0].NMSCompress(image, boxes, classIDs, classConfidences,
-                                                               confidenceThreshold=args.threshold,
-                                                               nmsThreshold=args.nms_threshold)
+    if args.nms_union:
+        boxes, confidences, classes = yoloDetectors[0].NMSCompress(image, rawBoxes, rawClasses, rawConfidences,
+                                                                   confidenceThreshold=args.threshold,
+                                                                   nmsThreshold=args.nms_threshold)
+    else:
+        boxes, confidences, classes = rawClasses, rawConfidences, rawBoxes
+
     print('Total compute time: %s' % str(datetime.datetime.now() - now))
 
     for i in range(len(classes)):
