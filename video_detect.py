@@ -4,7 +4,6 @@ import argparse
 
 from Detector import Detector
 
-
 def isNum(num):
     try:
         return int(num)
