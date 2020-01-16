@@ -2,94 +2,116 @@ import cv2
 import numpy as np
 import argparse
 import datetime
+import warnings 
 
 class Detector:
-    def __init__(self, config, weights, classes, nn_input=416):
+    def __init__(self, config, weights, classes, nn_input=416, backend='cpu'):
         self.__detector = cv2.dnn.readNet(weights, config)
 
-        self.__detector.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
-        self.__detector.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL_FP16)
+        if backend is 'cpu':
+            self.__detector.setPreferableBackend(cv2.dnn.DNN_BACKEND_DEFAULT)
+            self.__detector.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+        elif backend is 'cuda':
+            if self.__cv_version_check():
+                self.__detector.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+                self.__detector.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+            else:
+                self.__detector.setPreferableBackend(cv2.dnn.DNN_BACKEND_DEFAULT)
+                self.__detector.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+                warnings.warn('This OpenCV version is incompatible with CUDA backend. Required OpenCV 4.2.0 or higher')
+                warnings.warn(cv2.__version__)
+        else:
+            self.__detector.setPreferableBackend(cv2.dnn.DNN_BACKEND_DEFAULT)
+            self.__detector.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
 
-        classesFile = open(classes, 'r')
-        self.__classes = [line.strip() for line in classesFile.readlines()]
+        classes_file = open(classes, 'r')
+        self.__classes = [line.strip() for line in classes_file.readlines()]
         self.__scale = float(1/255)
         self.__nn_input = nn_input
 
-    def __getOutputLayers(self, detector):
-        layerNames = detector.getLayerNames()
-        outputLayers = [layerNames[i[0] - 1] for i in detector.getUnconnectedOutLayers()]
-        return outputLayers
+    def __cv_version_check(self):
+        v = cv2.__version__
+        v = [int(v.split('.')[0]), int(v.split('.')[1])]
 
-    def getClasses(self):
-        return self.__classes
+        if v[0] >= 4 and v[1] >= 2:
+            return True
+        else:
+            return False
 
-    def detect(self, image, confidenceThreshold=0.5):
+    def __get_output_layers(self, detector):
+        layer_names = detector.getLayerNames()
+        output_layers = [layer_names[i[0] - 1] for i in detector.getUnconnectedOutLayers()]
+        return output_layers
+
+    def detect(self, image, confidence_threshold=0.5):
         height, width, _ = image.shape
         blob = cv2.dnn.blobFromImage(image, self.__scale,
                                      (self.__nn_input, self.__nn_input),
                                      (0, 0, 0), True, crop=False)
+        
         self.__detector.setInput(blob)
-        results = self.__detector.forward(self.__getOutputLayers(self.__detector))
+        results = self.__detector.forward(self.__get_output_layers(self.__detector))
 
-        classIDs = []
-        classConfidences = []
+        classes = []
+        class_confidences = []
         boxes = []
 
         for result in results:
             for detection in result:
-                classScores = detection[5:]
-                classID = np.argmax(classScores)
-                classConfidence = classScores[classID]
-                if classConfidence > confidenceThreshold:
+                class_scores = detection[5:]
+                class_ID = np.argmax(class_scores)
+                class_confidence = class_scores[class_ID]
+
+                if class_confidence > confidence_threshold:
                     xCenter = int(detection[0] * width)
                     yCenter = int(detection[1] * height)
+
                     w = int(detection[2] * width)
                     h = int(detection[3] * height)
                     x = xCenter - w / 2
                     y = yCenter - h / 2
-                    classIDs.append(classID)
-                    classConfidences.append(float(classConfidence))
+
+                    classes.append(self.__classes[class_ID])
+                    class_confidences.append(float(class_confidence))
                     boxes.append([x, y, w, h])
 
-        return boxes, classConfidences, classIDs
+        return boxes, class_confidences, classes
 
-    def NMSCompress(self, image, boxes, classIDs, classConfidences, confidenceThreshold, nmsThreshold):
+    def NMS(self, image, boxes, class_confidences, confidence_threshold, nms_threshold):
         height, width, _ = image.shape
-        indices = cv2.dnn.NMSBoxes(boxes, classConfidences, confidenceThreshold, nmsThreshold)
+        indices = cv2.dnn.NMSBoxes(boxes, class_confidences, confidence_threshold, nms_threshold)
 
-        rClasses = []
-        rBoxes = []
+        r_boxes = []
 
         for i in indices:
             i = i[0]
             box = boxes[i]
-            xMin, yMin = round(box[0]), round(box[1])
-            xMax, yMax = round(xMin + box[2]), round(yMin + box[3])
+            x_min, y_min = round(box[0]), round(box[1])
+            x_max, y_max = round(x_min + box[2]), round(y_min + box[3])
 
-            if xMin < 0:
-                xMin = 0
-            if xMin > width:
-                xMin = width - 1
+            if x_min < 0:
+                x_min = 0
+            if x_min > width:
+                x_min = width - 1
 
-            if yMin < 0:
-                yMin = 0
-            if yMin > height:
-                yMin = height - 1
+            if y_min < 0:
+                y_min = 0
+            if y_min > height:
+                y_min = height - 1
 
-            if xMax < 0:
-                xMax = 0
-            if xMax > width:
-                xMax = width - 1
+            if x_max < 0:
+                x_max = 0
+            if x_max > width:
+                x_max = width - 1
 
-            if yMax < 0:
-                yMax = 0
-            if yMax > height:
-                yMax = height - 1
+            if y_max < 0:
+                y_max = 0
+            if y_max > height:
+                y_max = height - 1
 
-            rClasses.append(self.__classes[classIDs[i]])
-            rBoxes.append([int(xMin), int(yMin), int(xMax), int(yMax)])
+            r_boxes.append([int(x_min), int(y_min), int(x_max), int(y_max)])
 
-        return rBoxes, classConfidences, rClasses
+        return r_boxes
 
     def draw(self, image, label, box, label_color=(255, 255, 255), rec_color=(255, 255, 255),
              label_thickness=2, rec_thickness=2, label_size=0.5):
@@ -98,15 +120,7 @@ class Detector:
                     label_size, label_color, label_thickness)
         return image
 
-    def imageResize(image, width=None, height=None, inter=cv2.INTER_AREA):
-        """
-        Resize image with saving original proportions.
-        :param image: Image itself.
-        :param width: New image width.
-        :param height: New image height.
-        :param inter: Interpolation method.
-        :return: New resized image.
-        """
+    def imageResize(self, image, width=None, height=None, inter=cv2.INTER_AREA):
         if width is None and height is None:
             return image
 
@@ -120,77 +134,3 @@ class Detector:
             dim = (width, int(h * r))
 
         return cv2.resize(image, dim, interpolation=inter)
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser('Yolov3 Detector Super')
-    parser.add_argument('--image', type=str, required=True, help='Image source')
-    parser.add_argument('--config', type=str, required=True, help='Path to YOLOv3 cfg file')
-    parser.add_argument('--weights', type=str, required=True, help='Path to YOLOv3 weights file')
-    parser.add_argument('--classes', type=str, required=True, help='Path to YOLOv3 class file')
-    parser.add_argument('--threshold', type=float, default=0.5, help='Threshold value')
-    parser.add_argument('--nms_threshold', type=float, default=0.15, help='NMS threshold value')
-    parser.add_argument('--nn_input', type=str, default='320,416,512', help='Input size of YOLOv3 CNN')
-    parser.add_argument('--nms_union', type=int, default=1)
-    args = parser.parse_args()
-
-    print('Threshold: %f' % args.threshold)
-    print('NMS threshold: %f' % args.nms_threshold)
-    print('NMS union: %d' % args.nms_union)
-    print('Input size: %s' % args.nn_input)
-
-    nn_inputs = args.nn_input.split(',')
-
-    yoloDetectors = []
-    for i in range(len(nn_inputs)):
-        yoloDetectors.append(
-            Detector(config=args.config, weights=args.weights, classes=args.classes, nn_input=int(nn_inputs[i])))
-
-    image = cv2.imread(args.image)
-    height, width, _ = image.shape
-
-    print('========= [Path: %s] =========' % args.image)
-    print('W: %d H: %d' % (width, height))
-
-    rawBoxes = []
-    rawConfidences = []
-    rawClasses = []
-
-    now = datetime.datetime.now()
-    for i in range(len(nn_inputs)):
-        loop = datetime.datetime.now()
-        tmpBoxes, tmpConfidences, tmpClasses = yoloDetectors[i].detect(image, confidenceThreshold=args.threshold)
-
-        if not args.nms_union:
-            tmpBoxesStage1, tmpConfidencesStage1, tmpClassesStage1 = yoloDetectors[0].NMSCompress(image, tmpBoxes,
-                                                                                                  tmpClasses,
-                                                                                                  tmpConfidences,
-                                                                                                  confidenceThreshold=args.threshold,
-                                                                                                  nmsThreshold=args.nms_threshold)
-            rawBoxes += tmpBoxesStage1
-            rawConfidences += tmpConfidencesStage1
-            rawClasses += tmpClassesStage1
-        else:
-            rawBoxes += tmpBoxes
-            rawConfidences += tmpConfidences
-            rawClasses += tmpClasses
-        print('Loop %d(%s) compute time: %s' % (i, nn_inputs[i], str(datetime.datetime.now() - loop)))
-
-    if args.nms_union:
-        boxes, confidences, classes = yoloDetectors[0].NMSCompress(image, rawBoxes, rawClasses, rawConfidences,
-                                                                   confidenceThreshold=args.threshold,
-                                                                   nmsThreshold=args.nms_threshold)
-    else:
-        boxes, confidences, classes = rawClasses, rawConfidences, rawBoxes
-
-    print('Total compute time: %s' % str(datetime.datetime.now() - now))
-
-    for i in range(len(classes)):
-        image = yoloDetectors[0].draw(image, '', boxes[i], label_size=1)
-
-    print('Founded objects: %d' % len(boxes))
-    for i in range(len(boxes)):
-        print('%s (%f): %s' % (classes[i], round(confidences[i], 2), str(boxes[i])))
-
-    cv2.imshow('Detect', image)
-    cv2.waitKey()
-    cv2.destroyAllWindows()

@@ -6,91 +6,70 @@ import datetime
 
 from Detector import Detector
 
-parser = argparse.ArgumentParser('Detect vehicles on 2d-image, using YOLOv3 CNN')
-parser.add_argument('--path', type=str, required=True, help='Path with images')
-parser.add_argument('--config', type=str, required=True, help='Path to YOLOv3 cfg file')
-parser.add_argument('--weights', type=str, required=True, help='Path to YOLOv3 weights file')
-parser.add_argument('--classes', type=str, required=True, help='Path to YOLOv3 class file')
-parser.add_argument('--threshold', type=float, default=0.5, help='Threshold value')
-parser.add_argument('--nms_threshold', type=float, default=0.15, help='NMS threshold value')
-parser.add_argument('--nn_input', type=str, default='320,416,512', help='Input size of YOLOv3 CNN')
-parser.add_argument('--nms_union', type=int, default=1)
-args = parser.parse_args()
+def arg_source(x):
+    try:
+        return int(x)
+    except ValueError:
+        return str(x)
 
-print('Threshold: %f' % args.threshold)
-print('NMS threshold: %f' % args.nms_threshold)
-print('NMS union: %d' % args.nms_union)
-print('Input size: %s' % args.nn_input)
-
-nn_inputs = args.nn_input.split(',')
-
-yoloDetectors = []
-for i in range(len(nn_inputs)):
-    yoloDetectors.append(Detector(config=args.config, weights=args.weights, classes=args.classes, nn_input=int(nn_inputs[i])))
-
-imagePaths = glob.glob(os.path.abspath(args.path) + '/*.jpg')
-imagePaths += glob.glob(os.path.abspath(args.path) + '/*.png')
-
-imagePaths.sort()
-
-for path in imagePaths:
-    image = cv2.imread(path)
-    height, width, _ = image.shape
-
-    if height > 720:
-        image = yoloDetectors[0].imageResize(image=image, height=720)
-        height, width, _ = image.shape
-    elif width > 1280:
-        image = yoloDetectors[0].imageResize(image=image, width=1080)
-        height, width, _ = image.shape
-
-    print('========= [Path: %s] =========' % path)
-    print('W: %d H: %d' % (width, height))
-
-    rawBoxes = []
-    rawConfidences = []
-    rawClasses = []
-
-    now = datetime.datetime.now()
-    for i in range(len(nn_inputs)):
-        loop = datetime.datetime.now()
-        tmpBoxes, tmpConfidences, tmpClasses = yoloDetectors[i].detect(image, confidenceThreshold=args.threshold)
-
-        if not args.nms_union:
-            tmpBoxesStage1, tmpConfidencesStage1, tmpClassesStage1 = yoloDetectors[0].NMSCompress(image, tmpBoxes, tmpClasses, tmpConfidences,
-                                                                                 confidenceThreshold=args.threshold,
-                                                                                 nmsThreshold=args.nms_threshold)
-            rawBoxes += tmpBoxesStage1
-            rawConfidences += tmpConfidencesStage1
-            rawClasses += tmpClassesStage1
-        else:
-            rawBoxes += tmpBoxes
-            rawConfidences += tmpConfidences
-            rawClasses += tmpClasses
-        print('Loop %d(%s) compute time: %s' % (i, nn_inputs[i],str(datetime.datetime.now() - loop)))
-
-    if args.nms_union:
-        boxes, confidences, classes = yoloDetectors[0].NMSCompress(image, rawBoxes, rawClasses, rawConfidences,
-                                                                   confidenceThreshold=args.threshold,
-                                                                   nmsThreshold=args.nms_threshold)
+def arg_backend(x):
+    if x.upper().lower() in ['gpu', 'cuda', 'nvidia']:
+        return 'cuda'
+    elif x.upper().lower() in ['cpu']:
+        return 'cpu'
     else:
-        boxes, confidences, classes = rawClasses, rawConfidences, rawBoxes
+        return 'cpu'
 
-    print('Total compute time: %s' % str(datetime.datetime.now() - now))
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser('Yolov3 Detector')
+    parser.add_argument('--path', type=arg_source, required=True, help='Path with .jpg and .png photos')
+    parser.add_argument('--config', type=str, required=True, help='Path to Yolov3 cfg file')
+    parser.add_argument('--weights', type=str, required=True, help='Path to Yolov3 weights file')
+    parser.add_argument('--classes', type=str, required=True, help='Path to Yolov3 class file')
+    parser.add_argument('--threshold', type=float, default=0.5, help='Threshold value')
+    parser.add_argument('--nms_threshold', type=float, default=0.15, help='NMS threshold value')
+    parser.add_argument('--nn_input', type=int, default=416, help='Input size of Yolov3 CNN')
+    parser.add_argument('--backend', type=arg_backend, default='cpu', help='Select OpenCV backend (CPU or CUDA)')
+    args = parser.parse_args()
+    print(args)
+    print()
+    
+    yolo_detector = Detector(config=args.config, weights=args.weights, classes=args.classes, backend=args.backend, nn_input=args.nn_input)
+    
+    imagePaths = glob.glob(os.path.abspath(args.path) + '/*.jpg')
+    imagePaths += glob.glob(os.path.abspath(args.path) + '/*.png')
+    imagePaths.sort()
 
-    for i in range(len(classes)):
-        image = yoloDetectors[0].draw(image, '', boxes[i], label_size=1)
+    for path in imagePaths:
+        image = cv2.imread(path)
+        height, width, _ = image.shape
 
-    print('Founded objects: %d' % len(boxes))
-    for i in range(len(boxes)):
-        print('%s (%f): %s' % (classes[i], round(confidences[i], 2), str(boxes[i])))
+        if height > 720:
+            image = yolo_detector.imageResize(image=image, height=720)
+            height, width, _ = image.shape
+        elif width > 1280:
+            image = yolo_detector.imageResize(image=image, width=1080)
+            height, width, _ = image.shape
 
-    cv2.imshow('%s' % path, image)
-    print('Enter anything to continue (q to exit)')
-    if cv2.waitKey() & 0xFF == ord('q'):
-        print('Terminating')
-        exit(0)
+        print('Image: %s' % path)
+
+        raw_boxes, confidences, classes = yolo_detector.detect(image, confidence_threshold=args.threshold)
+        boxes = yolo_detector.NMS(image, raw_boxes, confidences,
+                                  confidence_threshold=args.threshold,
+                                  nms_threshold=args.nms_threshold)
+
+        for (obj_class, confidences, box) in zip(classes, confidences, boxes):
+            image = yolo_detector.draw(image, '%s: %.2f' % (obj_class, confidences), box)
+            print('%s: %.2f - %s' % (obj_class, confidences, str(box)))
+
+        cv2.imshow('%s' % path, image)
+
+        print('Enter anything to continue (q to exit)')
+        if cv2.waitKey() & 0xFF == ord('q'):
+            print('Terminating')
+            exit(0)
+        cv2.destroyAllWindows()
+        print()
+
+    cv2.waitKey()
     cv2.destroyAllWindows()
-
-cv2.waitKey()
-cv2.destroyAllWindows()
