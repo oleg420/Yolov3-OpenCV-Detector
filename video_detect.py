@@ -1,5 +1,4 @@
 import cv2
-import numpy as np
 import argparse
 
 from Detector import Detector
@@ -30,21 +29,18 @@ if __name__ == '__main__':
     parser.add_argument('--backend', type=arg_backend, default='cpu', help='Select OpenCV backend (CPU or CUDA)')
     args = parser.parse_args()
     print(args)
-    
+
     yolo_detector = Detector(config=args.config, weights=args.weights, classes=args.classes, backend=args.backend, nn_input=args.nn_input)
 
     cap = cv2.VideoCapture(args.source)
+    cap.set(3, 640)
+    cap.set(4, 480)
 
     while True:
         _, image = cap.read()
 
-        raw_boxes, confidences, classes = yolo_detector.detect(image, confidence_threshold=args.threshold)
-        boxes = yolo_detector.NMS(image, raw_boxes, confidences,
-                                  confidence_threshold=args.threshold,
-                                  nms_threshold=args.nms_threshold)
-
-        for (obj_class, confidences, box) in zip(classes, confidences, boxes):
-            image = yolo_detector.draw(image, '%s: %.2f' % (obj_class, confidences), box)
+        results = yolo_detector.detect(image, threshold=args.threshold, nms_threshold=args.nms_threshold)
+        image = yolo_detector.draw(image, results)
 
         cv2.imshow('Image', image)
         if cv2.waitKey(1) & 0xFF == ord('q'):
