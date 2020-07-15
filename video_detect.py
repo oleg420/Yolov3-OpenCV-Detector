@@ -1,7 +1,7 @@
 import cv2
 import argparse
 
-from Detector import Detector
+from Detector import ObjectDetection
 
 def arg_source(x):
     try:
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
 
-    yolo_detector = Detector(config=args.config, weights=args.weights, classes=args.classes, backend=args.backend, nn_input=args.nn_input)
+    yolo_detector = ObjectDetection(config=args.config, weights=args.weights, classes=args.classes, backend=args.backend, nn_input=args.nn_input)
 
     cap = cv2.VideoCapture(args.source)
     cap.set(3, 640)
