@@ -1,7 +1,7 @@
 import cv2
 import argparse
 
-from Detector import ObjectDetection
+from ObjectDetection import ObjectDetection
 
 def arg_source(x):
     try:
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
 
-    yolo_detector = ObjectDetection(config=args.config, weights=args.weights, classes=args.classes, backend=args.backend, nn_input=args.nn_input)
+    model = ObjectDetection(config=args.config, weights=args.weights, classes=args.classes, backend=args.backend, nn_input=args.nn_input)
 
     cap = cv2.VideoCapture(args.source)
     cap.set(3, 640)
@@ -39,8 +39,8 @@ if __name__ == '__main__':
     while True:
         _, image = cap.read()
 
-        results = yolo_detector.detect(image, threshold=args.threshold, nms_threshold=args.nms_threshold)
-        image = yolo_detector.draw(image, results)
+        results = model(image, threshold=args.threshold, nms_threshold=args.nms_threshold)
+        image = model.draw(image, results)
 
         cv2.imshow('Image', image)
         if cv2.waitKey(1) & 0xFF == ord('q'):

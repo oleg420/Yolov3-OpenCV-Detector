@@ -25,7 +25,7 @@ class ObjectDetection:
         output_layers = [layer_names[i[0] - 1] for i in detector.getUnconnectedOutLayers()]
         return output_layers
 
-    def detect(self, image, threshold=0.5, nms_threshold=0.15):
+    def __call__(self, image, threshold=0.5, nms_threshold=0.15):
         height, width, _ = image.shape
         blob = cv2.dnn.blobFromImage(image, self.scale,
                                      (self.size, self.size),

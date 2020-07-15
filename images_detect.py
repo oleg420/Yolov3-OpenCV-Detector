@@ -4,7 +4,7 @@ import os
 import cv2
 import datetime
 
-from Detector import Detector
+from ObjectDetection import Detector
 
 def arg_source(x):
     try:
